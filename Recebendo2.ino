@@ -2,7 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define BUZZER D2
+int buzzer =  D2;
 
 const char* ssid = "WLL-Inatel";
 const char* password = "inatelsemfio";  // senha da rede Wi-Fi
@@ -12,8 +12,8 @@ const char* mqttServer = "0d7c95f4e39541858c28b9278c812618.s1.eu.hivemq.cloud";
 const char* mqttUser = "INATEL";           
 const char* mqttPassword = "Telecom2025";  
 const int mqttPort = 8883;                 
-const char* mqttTopicSub = "TROCARESSENOO/#";       
-const char* ID = "aa";            
+const char* mqttTopicSub = "TROCARESSENOME/#";       
+const char* ID = "TROCARESSENOME";// Deve ser um nome único na rede            
 
 WiFiClientSecure espClient;  // CLIENTE SEGURO
 PubSubClient client(espClient);
@@ -26,12 +26,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   if (MSG == 1) {
     Serial.println("Ligando LED!");
-    digitalWrite(BUZZER, HIGH);
+    tone(buzzer, 2000);  // Toca som a 1000 Hz
     delay(1000);
-    digitalWrite(BUZZER, LOW);
+    tone(buzzer, 0);  // Toca som a 1000 Hz
   } else if (MSG == 0) {
     Serial.println("Desligando LED!");
-    digitalWrite(BUZZER, LOW);
+    tone(buzzer, 0);  // Toca som a 1000 Hz
   }
 }
 
@@ -52,7 +52,7 @@ void connect() {
 
 void setup() {
   Serial.begin(115200);
-  pinMode(BUZZER, OUTPUT);
+  pinMode(buzzer, OUTPUT);
   
   Serial.println("Conectando ao Wi-Fi...");
   WiFi.begin(ssid, password);  

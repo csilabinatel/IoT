@@ -2,7 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define botao D8  // Definição do pino do botão
+#define botao D2  // Definição do pino do botão
 
 // Informações da rede Wi-Fi
 const char* ssid = "WLL-Inatel";         
@@ -13,7 +13,7 @@ const char* mqttServer = "0d7c95f4e39541858c28b9278c812618.s1.eu.hivemq.cloud";
 const char* mqttUser = "INATEL";           
 const char* mqttPassword = "Telecom2025";  
 const int mqttPort = 8883;   
-const char* ID = "aaaaa";  // Nome do dispositivo
+const char* ID = "TROCARESSENOME";  // Nome do dispositivo que deve ser único
 const char* mqttTopicPub = "TROCARESSENOME";  // Tópico onde o ESP vai publicar mensagens
 
 WiFiClientSecure espClient;  
