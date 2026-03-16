@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Dados Sensor</title>
+</head>
+
+<body>
+
+<h2>Leitura do Sensor</h2>
+
+<button onclick="carregar()">Atualizar</button>
+
+<ul id="dados"></ul>
+
+<script>
+
+function carregar(){
+
+fetch("http://localhost:5000/dados")
+
+.then(res => res.json())
+
+.then(data => {
+
+let lista = document.getElementById("dados")
+lista.innerHTML = ""
+
+data.forEach(linha => {
+
+let item = document.createElement("li")
+
+item.innerText = "ID: " + linha[0] + " | Valor: " + linha[1]
+
+lista.appendChild(item)
+
+})
+
+})
+
+}
+
+</script>
+
+</body>
+</html>
