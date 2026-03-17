@@ -10,7 +10,7 @@ const int mqtt_port = 1883;
 const char* mqtt_user = "";//csilab
 const char* mqtt_pass = "";//WhoAmI#2024
 
-#define TEMP_PIN D34  // Definição do pino do SENSOR
+#define TEMP_PIN A0;  // Definição do pino do SENSOR
 
 
 int TEMP = 0;  // Variável que armazenará o valor de temperatura do sensor (exemplo)
