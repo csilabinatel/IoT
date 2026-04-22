@@ -1,66 +1,62 @@
-#include <SPI.h> // Biblioteca para comunicação SPI (usada pelo LoRa)
-#include <LoRa.h>  // Biblioteca para controle do módulo LoRa
+#include <SPI.h>
+#include <LoRa.h>
 
-// Pinos
-#define NSS 10 // Pino Chip Select (SS)
-#define RST 9  // Pino de reset do módulo LoRa
-#define DIO0 2 // Pino de interrupção (indica pacote recebido)
+// Pinos para Arduino Uno
+#define NSS 10
+#define RST 9
+#define DIO0 2
 
 void setup() {
-  Serial.begin(115200);  // Inicializa a comunicação serial  115200
-  while (!Serial); // Aguarda a serial iniciar (útil em algumas placas)
+  Serial.begin(115200);
+  while (!Serial);
 
+  LoRa.setPins(NSS, RST, DIO0);
 
-  LoRa.setPins(NSS, RST, DIO0); // Define os pinos do LoRa
-
-  // Inicializa o LoRa na frequência de 915 MHz
+  // Inicia o rádio
   if (!LoRa.begin(915E6)) {
-    Serial.println("Erro LoRa");// Mensagem de erro se não inicializar
-    while (true);// Trava o programa se der erro
+    Serial.println("Erro ao iniciar LoRa");
+    while (true);
   }
 
-  
-  LoRa.setSpreadingFactor(7); // Define o Spreading Factor (velocidade vs alcance)
-  LoRa.setSignalBandwidth(125E3); // Define largura de banda (125 kHz)
-  LoRa.setCodingRate4(5);// Define taxa de codificação (correção de erro)
-  LoRa.enableCrc(); // Ativa verificação de erro (CRC)
+  // --- OTIMIZAÇÃO DE VELOCIDADE ---
+  // SF7 é o mais rápido. Se quiser MAIS rápido, use 6 (mas exige precisão de cristal)
+  LoRa.setSpreadingFactor(7); 
+  // Largura de banda de 125E3 é padrão. 250E3 seria mais rápido, mas 125 é mais estável.
+  LoRa.setSignalBandwidth(125E3); 
+  LoRa.setCodingRate4(5);
+  LoRa.enableCrc();
 
-  Serial.println("RX OK");// Indica que o receptor está pronto
+  Serial.println("RX veloz iniciado. Aguardando Grupo 1...");
 }
 
 void loop() {
+  // Verifica se chegou pacote
+  int packetSize = LoRa.parsePacket();
 
-  int packetSize = LoRa.parsePacket();// Verifica se chegou algum pacote
+  if (packetSize) {
+    String recebido = "";
 
-  if (packetSize) {// Se um pacote foi recebido
-
-    String msg = ""; // String para armazenar a mensagem recebida
-
-    while (LoRa.available()) { // Enquanto houver dados disponíveis
-      char c = (char)LoRa.read();// Lê um caractere do buffer
-
-      //filtro
-      if (c >= 32 && c <= 126) {
-        msg += c;
-      }
+    // Lê o pacote caractere por caractere
+    while (LoRa.available()) {
+      recebido += (char)LoRa.read();
     }
 
-    if (msg.length() < 5) return;
-    if (!msg.startsWith("Grupo1:")) return;// Ignora mensagens que não começam com "Grupo1:"
+    // Filtra apenas o Grupo 1
+    if (recebido.startsWith("Grupo1:")) {
+      // Isola o valor após os 7 caracteres de "Grupo1:"
+      String valor = recebido.substring(7);
+      
+      // Limpa espaços ou quebras de linha extras que venham do TX
+      valor.trim(); 
 
-    String dado = msg.substring(7);
-
-    if (dado.startsWith("Solo Umido")) { // Verifica se o solo está úmido
-
-      Serial.print("UMIDO -> ");
-      Serial.println(dado);
-
-    } else {
-
-      int valor = dado.toInt(); // Converte o dado para número (caso seja valor de sensor)
-
-      Serial.print("SECO -> "); // Indica solo seco
-      Serial.println(valor); // Mostra o valor recebido
+      Serial.print("Umidade G1: ");
+      Serial.println(valor);
+      
+      // RSSI mostra a qualidade do sinal (perto de 0 é melhor, ex: -35 é ótimo)
+      Serial.print("Sinal: ");
+      Serial.print(LoRa.packetRssi());
+      Serial.println(" dBm");
+      Serial.println("---");
     }
   }
 }
