@@ -21,36 +21,26 @@ void setup() {
     Serial.println("Erro ao iniciar LoRa"); // Mostra erro se não conseguir iniciar
     while (true);                // Trava o programa caso haja falha
   }
+  LoRa.setSpreadingFactor(7);
+  LoRa.setSignalBandwidth(125E3);
+  LoRa.setCodingRate4(5);
+  LoRa.enableCrc();
 
   Serial.println("LoRa transmissor iniciado"); // Confirma inicialização com sucesso
 }
 
 void loop() {
-  float umidade = analogRead(SENSOR); // Lê o valor analógico do sensor (0 a 1023)
+  float umidade = analogRead(SENSOR);
 
-  if (umidade>700) {  // Verifica se o valor indica solo seco (limiar definido como 700)
+  // ENVIO IGUAL PARA OS DOIS CASOS
+  LoRa.beginPacket();
+  LoRa.print("Grupo1:");
+  LoRa.println(umidade); 
+  LoRa.endPacket();
 
-    umidade2 = umidade; // Armazena o valor lido em outra variável
+  // SERIAL IGUAL PARA OS DOIS CASOS
+  Serial.print("Enviado: ");
+  Serial.println(umidade);
 
-    LoRa.beginPacket(); // Inicia o pacote de dados para envio
-    LoRa.print("Grupo1:"); // Envia identificador do grupo
-    LoRa.print(umidade);   // Envia o valor da umidade
-    LoRa.endPacket();      // Finaliza e transmite o pacote
-
-    Serial.print("Enviado: "); // Mensagem no monitor serial
-    Serial.println(umidade);   // Mostra o valor enviado
-
-    delay(5000); // Aguarda 5 segundos antes do próximo envio
-  }
-  else { // Caso o valor seja menor ou igual a 700 (solo úmido)
-
-    LoRa.beginPacket(); // Inicia o pacote de dados
-    LoRa.print("Grupo1:"); // Envia identificador
-    LoRa.print("Solo Umido: "); // Indica que o solo está úmido
-    LoRa.print(umidade); // Envia valor da leitura
-    LoRa.endPacket(); // Finaliza e envia o pacote
-
-    Serial.println("Solo,ok"); // Mensagem indicando estado normal
-    delay(5000); // Aguarda 5 segundos
-  }
+  delay(500);
 }
