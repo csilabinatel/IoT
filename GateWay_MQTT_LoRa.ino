@@ -1,167 +1,138 @@
-// ===== BIBLIOTECAS =====
-#include <WiFi.h>
-#include <PubSubClient.h>
 #include <SPI.h>
 #include <LoRa.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
 
-// ===== PINOS LORA (ESP32) =====
-#define NSS 5
-#define RST 14
-#define DIO0 2
-#define SCK 18
-#define MISO 19
-#define MOSI 23
+// ================= CONFIGURACOES WIFI =================
+const char* ssid     = "CSI-Lab";
+const char* password = "In@teLCS&I";
 
-// ===== WIFI =====
-const char* rede = "CSI-Lab";          // Nome da rede Wi-Fi
-const char* password = "In@teLCS&I";   // Senha do Wi-Fi
+// ================= CONFIGURACOES MQTT =================
+const char* mqtt_server = "192.168.66.11";
+const int   mqtt_port   = 1883;
+const char* mqtt_user   = "csilab";
+const char* mqtt_pass   = "WhoAmI#2024";
 
-WiFiClient cliente;
-PubSubClient client(cliente);
+// ================= PINOS LORA (ESP32) =================
+// Use estes pinos para conectar o modulo LoRa no ESP32
+#define LORA_SCK  18
+#define LORA_MISO 19
+#define LORA_MOSI 23
+#define LORA_SS   5
+#define LORA_RST  26
+#define LORA_DIO0 2
+#define LORA_FREQ 915E6
 
-// ===== MQTT (CORRIGIDO CONFORME IMAGEM) =====
-const char* mqttuser = "csilab";           // Usuário MQTT
-const char* mqttsenha = "WhoAmI#2024";     // Senha MQTT
-const char* mqttserver = "192.168.66.11"; // IP correto do broker
-const int mqttport = 1883;                // Porta MQTT
+WiFiClient espClient;
+PubSubClient client(espClient);
 
-// ===== CONTROLE =====
-unsigned long lasttempo = 0;  // controle de reconexão MQTT
+// ================= FUNCOES DE CONEXAO =================
 
-void setup() 
-{
-  Serial.begin(115200);
-  while(!Serial);
+void setup_wifi() {
+  delay(10);
+  Serial.print("Conectando em: ");
+  Serial.println(ssid);
 
-  // ===== SPI (OBRIGATÓRIO NO ESP32) =====
-  SPI.begin(SCK, MISO, MOSI, NSS);
+  WiFi.begin(ssid, password);
 
-  // ===== LORA =====
-  Serial.println("Receptor LoRa");
-  LoRa.setPins(NSS, RST, DIO0);
-
-  if(!LoRa.begin(915E6)) {
-    Serial.println("Erro LoRa");
-    while(1); // trava se falhar
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
   }
 
-  // Parâmetros de comunicação (tem que bater com TX)
+  Serial.println("\nWiFi conectado!");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+}
+
+void reconnect_mqtt() {
+  // Loop ate conectar no MQTT
+  while (!client.connected()) {
+    Serial.print("Tentando conexao MQTT...");
+    // ID do cliente unico para este gateway
+    if (client.connect("Gateway_Grupo1_ESP32", mqtt_user, mqtt_pass)) {
+      Serial.println(" conectado com sucesso!");
+    } else {
+      Serial.print(" falhou, rc=");
+      Serial.print(client.state());
+      Serial.println(" tentando novamente em 5 segundos");
+      delay(5000);
+    }
+  }
+}
+
+// ================= SETUP PRINCIPAL =================
+
+void setup() {
+  Serial.begin(115200);
+
+  // Inicia conexao sem fio
+  setup_wifi();
+  client.setServer(mqtt_server, mqtt_port);
+
+  // Inicia comunicacao SPI e o Radio LoRa
+  SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
+  LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
+
+  if (!LoRa.begin(LORA_FREQ)) {
+    Serial.println("Erro critico: Modulo LoRa nao encontrado!");
+    while (1);
+  }
+
+  // Sincronizacao identica ao seu Transmissor (TX)
   LoRa.setSpreadingFactor(7);
   LoRa.setSignalBandwidth(125E3);
   LoRa.setCodingRate4(5);
   LoRa.enableCrc();
 
-  // ===== WIFI =====
-  Serial.print("Conectando Wi-Fi: ");
-  Serial.println(rede);
-
-  WiFi.begin(rede, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(100);
-    Serial.print(".");
-  }
-
-  Serial.println("\nWi-Fi conectado!");
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
-
-  // ===== MQTT =====
-  client.setServer(mqttserver, mqttport); // define broker
+  Serial.println("Gateway online. Escutando Grupo 1...");
 }
 
-void loop()
-{
-  // ===== GARANTE MQTT CONECTADO ANTES DE TUDO =====
+// ================= LOOP PRINCIPAL =================
+
+void loop() {
+  // Mantem conexao MQTT viva
   if (!client.connected()) {
-    unsigned long now = millis();
-
-    if (now - lasttempo > 5000) {
-      lasttempo = now;
-
-      Serial.print("Conectando MQTT...");
-
-      // ID único evita conflito
-      String clientId = "ESP32-";
-      clientId += String(random(0xffff), HEX);
-
-      if (client.connect(clientId.c_str(), mqttuser, mqttsenha)) {
-        Serial.println("OK");
-        client.publish("Status", "ESP32 conectado");
-      } else {
-        Serial.print("Falhou rc=");
-        Serial.println(client.state()); // DEBUG REAL DO ERRO
-        return; // NÃO CONTINUA SE NÃO CONECTAR
-      }
-    }
-  } 
-  else {
-    client.loop(); // mantém conexão ativa
+    reconnect_mqtt();
   }
+  client.loop();
 
-  // ===== RECEBE LORA =====
-  int pacote = LoRa.parsePacket();
+  // Tenta capturar um pacote de radio
+  int packetSize = LoRa.parsePacket();
+  
+  if (packetSize) {
+    String recebido = "";
 
-  if(pacote) 
-  {
-    String receber = "";
-
+    // Le o pacote caractere por caractere
     while (LoRa.available()) {
-      char c = (char)LoRa.read();
+      recebido += (char)LoRa.read();
+    }
 
-      // aceita só caracteres válidos (remove lixo)
-      if (c >= 32 && c <= 126) {
-        receber += c;
+    // Filtra apenas o Grupo 1 conforme o seu TX envia
+    if (recebido.startsWith("Grupo1:")) {
+      
+      // Isola apenas o numero (tira o prefixo "Grupo1:")
+      String valorUmidade = recebido.substring(7);
+      valorUmidade.trim(); // Remove quebras de linha (\n \r)
+
+      // Mostra no monitor serial para conferencia
+      Serial.println("--- NOVO DADO ---");
+      Serial.print("Origem: Grupo 1 | Valor: ");
+      Serial.println(valorUmidade);
+      Serial.print("Sinal (RSSI): ");
+      Serial.print(LoRa.packetRssi());
+      Serial.println(" dBm");
+
+      // Define o topico MQTT
+      String topic = "sensores/grupo1/umidade";
+
+      // Envia para o Broker MQTT
+      if (client.publish(topic.c_str(), valorUmidade.c_str())) {
+        Serial.println("Status: Enviado para MQTT");
+      } else {
+        Serial.println("Status: Erro ao enviar MQTT");
       }
+      Serial.println("-----------------");
     }
-
-    receber.trim();
-
-    // ignora pacote inválido
-    if (receber.length() < 5) return;
-    if (!receber.startsWith("Grupo1:")) return;
-
-    Serial.print("Pacote Recebido: ");
-    Serial.println(receber);
-
-    // ===== TRATAMENTO =====
-    String dado = receber.substring(7);
-    String payload;
-
-    if (dado.startsWith("Solo Umido")) {
-
-      Serial.println("UMIDO");
-
-      payload = "UMIDO";
-
-    } else {
-
-      int valor = dado.toInt();
-
-      Serial.print("SECO: ");
-      Serial.println(valor);
-
-      payload = "SECO:";
-      payload += String(valor);
-    }
-
-    // ===== ENVIA MQTT (AGORA GARANTIDO CONECTADO) =====
-    if (client.connected()) {
-      client.publish("Lora/Solo", payload.c_str());
-      Serial.print("Enviado MQTT: ");
-      Serial.println(payload);
-    } else {
-      Serial.println("Erro: MQTT caiu antes de publicar");
-    }
-  }
-
-  delay(200);
-
-  // ===== RECONEXÃO WIFI =====
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Reconectando Wi-Fi...");
-    WiFi.disconnect();
-    WiFi.begin(rede, password);
-    delay(3000);
   }
 }
