@@ -1,0 +1,159 @@
+//LoRa RX - LED
+
+// Inclui biblioteca SPI (comunicação com o módulo LoRa)
+#include <SPI.h>
+// Inclui biblioteca do LoRa
+#include <LoRa.h>
+// Define o pino NSS (Chip Select)
+#define NSS 10
+// Define o pino de RESET do LoRa
+#define RST 9
+// Define o pino de interrupção (DIO0)
+#define DIO0 2
+// Define o pino do LED
+#define LED 7
+void setup() {
+  // Define o LED como saída
+  pinMode(LED, OUTPUT);
+  // Inicia comunicação serial
+  Serial.begin(9600);
+  // Configura os pinos do LoRa
+  LoRa.setPins(NSS, RST, DIO0);
+  // Inicializa o LoRa na frequência 915 MHz
+  LoRa.begin(915E6);
+}
+void loop() {
+  // Verifica se chegou pacote LoRa
+  int packetSize = LoRa.parsePacket();
+  // Se recebeu algo
+  if (packetSize) {
+    // String para armazenar mensagem
+    String msg = "";
+    // Lê todos os bytes recebidos
+    while (LoRa.available()) {
+      msg += (char)LoRa.read();
+    }
+    // Se mensagem for "1"
+    if (msg == "1") {
+      // Liga o LED
+      digitalWrite(LED, HIGH);
+    } 
+    else {
+      // Desliga o LED
+      digitalWrite(LED, LOW);
+    }
+  }
+}
+-----------------------------------------------------------------
+//2. Sensor de Umidade
+
+// Define o pino analógico do sensor
+#define SENSOR A0
+void setup() {
+  // Inicia comunicação serial
+  Serial.begin(9600);
+}
+void loop() {
+  // Lê valor analógico do sensor
+  int valor = analogRead(SENSOR);
+  // Envia valor para o monitor serial
+  Serial.println(valor);
+  // Aguarda 1 segundo
+  delay(1000);
+}
+---------------------------------------------------------------
+//4. Sensor MQ-2
+// Define o pino do sensor de gás
+#define MQ2 A2
+void setup() {
+  // Inicia serial
+  Serial.begin(9600);
+}
+void loop() {
+  // Lê valor do sensor
+  int gas = analogRead(MQ2);
+  // Exibe valor
+  Serial.println(gas);
+  // Delay
+  delay(1000);
+}
+---------------------------------------------------
+//5. Sensor DHT11
+
+// Inclui biblioteca do DHT
+#include <DHT.h>
+// Define o pino do sensor
+#define DHTPIN 3
+// Define o tipo do sensor
+#define DHTTYPE DHT11
+// Cria objeto do sensor
+DHT dht(DHTPIN, DHTTYPE);
+void setup() {
+  // Inicia serial
+  Serial.begin(9600);
+  // Inicializa sensor
+  dht.begin();
+}
+void loop() {
+  // Lê temperatura
+  float temp = dht.readTemperature();
+  // Lê umidade
+  float hum = dht.readHumidity();
+  // Mostra temperatura
+  Serial.print("Temp: ");
+  Serial.print(temp);
+  // Mostra umidade
+  Serial.print(" Hum: ");
+  Serial.println(hum);
+  // Aguarda 2 segundos
+  delay(2000);
+}
+-----------------------------------------
+// Define pino do botão
+#define BOTAO 4
+void setup() {
+6. Botão
+  // Define botão como entrada com pull-up interno
+  pinMode(BOTAO, INPUT_PULLUP);
+  // Inicia serial
+  Serial.begin(9600);
+}
+void loop() {
+  // Se botão pressionado (LOW)
+  if (digitalRead(BOTAO) == LOW) {
+    // Envia 1
+    Serial.println(1);
+  } 
+  else {
+    // Envia 0
+    Serial.println(0);
+  }
+  // Pequeno delay
+  delay(200);
+}
+-------------------------------------------------------
+// Define o pino digital do LDR
+#define LDR 7  // pino digital
+
+void setup() {
+  // Inicia serial
+  Serial.begin(9600);
+
+  // Define o pino como entrada
+  pinMode(LDR, INPUT);
+}
+
+void loop() {
+  // Lê valor digital (HIGH ou LOW)
+  int estado = digitalRead(LDR);
+
+  // Mostra no serial
+  Serial.println(estado);
+
+  // Espera 1 segundo
+  delay(1000);
+}
+-------------------------
+
+
+
