@@ -22,7 +22,7 @@ void setup() {
     while (true);                // Trava o programa caso haja falha
   }
   LoRa.setSpreadingFactor(7);(7 Velocidade alta com alcance menor)Quantos bits são usados para representar cada símbolo,afeta diretamente alcance e velocidade = 2^7=128;
-  LoRa.setSignalBandwidth(125E3);//Tamanho da faixa de Frêquencia
+  LoRa.setSignalBandwidth(125E3);//Tamanho da faixa de Frêquencia,
   LoRa.setCodingRate4(5);//Envia Bits extras para uma correção
   LoRa.enableCrc();//Verificação de erro(Verifica o que foi transmitido com o que está nele)
 
