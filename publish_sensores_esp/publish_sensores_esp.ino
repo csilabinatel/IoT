@@ -1,80 +1,95 @@
-#include <ESP8266WiFi.h> // use esta se for ESP8266
-#include <PubSubClient.h>
+#include <ESP8266WiFi.h>   // Biblioteca para conexão WiFi no ESP8266
+#include <PubSubClient.h>  // Biblioteca para comunicação MQTT
 
-const char* ssid = "";//CSI-Lab - Senha
-const char* password = "";//In@teLCS&I - Senha
+// ====== CONFIGURAÇÕES WIFI ======
+const char* ssid = "";       // Nome da rede WiFi
+const char* password = "";   // Senha do WiFi
 
-const char* mqtt_server = "";//192.168.66.11 ip 
-const int mqtt_port = 1883;
+// ====== CONFIGURAÇÕES MQTT ======
+const char* mqtt_server = ""; // IP do broker MQTT (ex: 192.168.1.10)
+const int mqtt_port = 1883;   // Porta padrão MQTT
 
-const char* mqtt_user = "";//csilab
-const char* mqtt_pass = "";//WhoAmI#2024
+const char* mqtt_user = "";   // Usuário do broker
+const char* mqtt_pass = "";   // Senha do broker
 
-#define TEMP_PIN A0  // Definição do pino do SENSOR
+// ====== DEFINIÇÃO DE PINO ======
+#define BOTAO_PIN D3   // Pino onde o botão está conectado (GPIO0)
 
+// ====== VARIÁVEIS ======
+int estadoBotao = 0;   // Variável para armazenar estado do botão
 
-int TEMP = 0;  // Variável que armazenará o valor de temperatura do sensor (exemplo)
+WiFiClient espClient;           // Cria cliente WiFi
+PubSubClient client(espClient); // Cria cliente MQTT
 
-WiFiClient espClient; // Cria um cliente WiFi 
-PubSubClient client(espClient);// Cria o cliente MQT
-
-void conectaWiFi() {// CONEXÃO PARA O WI-FI 
-  WiFi.begin(ssid, password);
+// ====== FUNÇÃO WIFI ======
+void conectaWiFi() {
+  WiFi.begin(ssid, password); // Inicia conexão com WiFi
 
   Serial.print("Conectando WiFi");
 
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED) { // Espera conectar
     delay(500);
     Serial.print(".");
   }
 
   Serial.println();
   Serial.println("WiFi conectado");
-  Serial.println(WiFi.localIP());//DEIXA CLARO QUAL O IP 
+  Serial.println(WiFi.localIP()); // Mostra IP do ESP
 }
 
-void conectaMQTT() {// CONEXÃO COM MQTT
-
-  while (!client.connected()) {
+// ====== FUNÇÃO MQTT ======
+void conectaMQTT() {
+  while (!client.connected()) { // Enquanto não conectar
 
     Serial.print("Conectando ao broker MQTT...");
 
-    if (client.connect("ESP_Client", mqtt_user, mqtt_pass)) {//Tenta se conectar com a senha e user 
+    if (client.connect("ESP_Client", mqtt_user, mqtt_pass)) { // Tenta conectar
       Serial.println("conectado");
     } 
     
     else {
       Serial.print("Erro, rc=");
-      Serial.print(client.state());
-      Serial.println(" tentando novamente em 5s");//Se não se conectar vai novamente 
-      delay(5000);
+      Serial.print(client.state()); // Mostra erro
+      Serial.println(" tentando novamente em 5s");
+      delay(5000); // Aguarda antes de tentar novamente
     }
   }
 }
 
+// ====== SETUP ======
 void setup() {
 
-  Serial.begin(115200);
+  Serial.begin(115200); // Inicia comunicação serial
 
-  conectaWiFi();
-  pinMode(TEMP_PIN, INPUT); // Define o pino 34 como entrada para leitura de sensor
-  client.setServer(mqtt_server, mqtt_port);
+  conectaWiFi(); // Conecta no WiFi
 
-  conectaMQTT();
+  pinMode(BOTAO_PIN, INPUT_PULLUP); // Define botão com pull-up interno
+
+  client.setServer(mqtt_server, mqtt_port); // Define servidor MQTT
+
+  conectaMQTT(); // Conecta ao broker
 }
 
+// ====== LOOP PRINCIPAL ======
 void loop() {
 
   if (!client.connected()) {
-    conectaMQTT();
+    conectaMQTT(); // Reconecta se cair
   }
 
-  client.loop();
-  TEMP = analogRead(TEMP_PIN);// Leitura do pino para sensor analogica 
-  client.publish("sensor/teste", String(TEMP).c_str());// PRECISA TRANSFORMAR EM STRING
-  // SER PUBLICADO NO MQTT EM JSON
+  client.loop(); // Mantém conexão ativa
 
-  Serial.println("Mensagem publicada");
+  // ===== LEITURA DO BOTÃO =====
+  int leitura = digitalRead(BOTAO_PIN); // Lê o pino
 
-  delay(5000);
+  // Com pull-up: LOW = pressionado, HIGH = solto
+  estadoBotao = (leitura == LOW) ? 1 : 0;
+
+  // ===== PUBLICAÇÃO MQTT =====
+  client.publish("casa/botao", String(estadoBotao).c_str()); // Envia valor
+
+  Serial.print("Botão: ");
+  Serial.println(estadoBotao); // Mostra no serial
+
+  delay(2000); // Aguarda 2 segundos
 }
