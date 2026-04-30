@@ -89,5 +89,5 @@ void loop() {
     client.publish(topic, "0");           // Publica "0" no tópico MQTT
   }
 
-  delay(1000);                            // Espera 1 segundo antes de repetir
+  delay(7000);                            // Espera 1 segundo antes de repetir
 }
