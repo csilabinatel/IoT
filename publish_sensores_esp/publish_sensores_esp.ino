@@ -1,95 +1,93 @@
-#include <ESP8266WiFi.h>   // Biblioteca para conexão WiFi no ESP8266
+#include <ESP8266WiFi.h>   // Biblioteca para controlar o Wi-Fi no ESP8266
 #include <PubSubClient.h>  // Biblioteca para comunicação MQTT
 
-// ====== CONFIGURAÇÕES WIFI ======
-const char* ssid = "";       // Nome da rede WiFi
-const char* password = "";   // Senha do WiFi
+// ====== CONFIGURAÇÃO WIFI ======
+const char* ssid = "CSI-Lab";          // Nome da rede Wi-Fi que o ESP vai conectar
+const char* password = "In@teLCS&I";   // Senha da rede Wi-Fi
 
-// ====== CONFIGURAÇÕES MQTT ======
-const char* mqtt_server = ""; // IP do broker MQTT (ex: 192.168.1.10)
-const int mqtt_port = 1883;   // Porta padrão MQTT
+// ====== CONFIGURAÇÃO MQTT ======
+const char* server = "192.168.66.11";  // IP do broker MQTT (servidor)
+const int port = 1883;                 // Porta do MQTT (1883 = sem criptografia)
+const char* user = "csilab";           // Usuário do broker MQTT
+const char* pass = "WhoAmI#2024";      // Senha do broker MQTT
+const char* topic = "casa/botao";      // Tópico onde vamos publicar
 
-const char* mqtt_user = "";   // Usuário do broker
-const char* mqtt_pass = "";   // Senha do broker
+// ====== PINO DO BOTÃO ======
+#define BOTAO D2   // Pino D2 (evite D3 pois pode impedir o boot do ESP)
 
-// ====== DEFINIÇÃO DE PINO ======
-#define BOTAO_PIN D3   // Pino onde o botão está conectado (GPIO0)
+// ====== OBJETOS ======
+WiFiClient wifiClient;                 // Cria um cliente de rede Wi-Fi
+PubSubClient client(wifiClient);       // Cria cliente MQTT usando o Wi-Fi
 
-// ====== VARIÁVEIS ======
-int estadoBotao = 0;   // Variável para armazenar estado do botão
-
-WiFiClient espClient;           // Cria cliente WiFi
-PubSubClient client(espClient); // Cria cliente MQTT
-
-// ====== FUNÇÃO WIFI ======
+// ====== FUNÇÃO PARA CONECTAR NO WIFI ======
 void conectaWiFi() {
-  WiFi.begin(ssid, password); // Inicia conexão com WiFi
+  Serial.println("Iniciando WiFi...");     // Mostra mensagem na serial
 
-  Serial.print("Conectando WiFi");
+  WiFi.begin(ssid, password);              // Inicia tentativa de conexão com Wi-Fi
 
-  while (WiFi.status() != WL_CONNECTED) { // Espera conectar
-    delay(500);
-    Serial.print(".");
+  while (WiFi.status() != WL_CONNECTED) {  // Enquanto não conectar no Wi-Fi
+    Serial.println("Tentando conectar..."); // Mostra tentativa na serial
+    delay(1000);                           // Espera 1 segundo antes de tentar de novo
   }
 
-  Serial.println();
-  Serial.println("WiFi conectado");
-  Serial.println(WiFi.localIP()); // Mostra IP do ESP
+  Serial.println("WiFi conectado!");       // Confirma conexão
+  Serial.println(WiFi.localIP());          // Mostra o IP do ESP
 }
 
-// ====== FUNÇÃO MQTT ======
+// ====== FUNÇÃO PARA CONECTAR NO MQTT ======
 void conectaMQTT() {
-  while (!client.connected()) { // Enquanto não conectar
+  Serial.println("Conectando MQTT...");    // Informa que vai conectar no broker
 
-    Serial.print("Conectando ao broker MQTT...");
+  while (!client.connected()) {            // Enquanto não estiver conectado ao broker
 
-    if (client.connect("ESP_Client", mqtt_user, mqtt_pass)) { // Tenta conectar
-      Serial.println("conectado");
-    } 
-    
-    else {
-      Serial.print("Erro, rc=");
-      Serial.print(client.state()); // Mostra erro
-      Serial.println(" tentando novamente em 5s");
-      delay(5000); // Aguarda antes de tentar novamente
+    // Tenta conectar usando ID, usuário e senha
+    if (client.connect("ESP8266_CLIENTE", user, pass)) {
+      Serial.println("MQTT conectado!");   // Conectou com sucesso
+    } else {
+      Serial.print("Erro MQTT: ");         // Mostra erro se falhar
+      Serial.println(client.state());      // Código do erro
+      delay(2000);                        // Espera 2 segundos antes de tentar de novo
     }
   }
 }
 
-// ====== SETUP ======
+// ====== SETUP (RODA UMA VEZ) ======
 void setup() {
 
-  Serial.begin(115200); // Inicia comunicação serial
+  Serial.begin(115200);                   // Inicia comunicação serial em 115200
+  Serial.println("INICIOU");              // Teste para ver se o código começou
 
-  conectaWiFi(); // Conecta no WiFi
+  pinMode(BOTAO, INPUT_PULLUP);           // Define botão como entrada com pull-up interno
 
-  pinMode(BOTAO_PIN, INPUT_PULLUP); // Define botão com pull-up interno
+  conectaWiFi();                          // Chama função para conectar no Wi-Fi
 
-  client.setServer(mqtt_server, mqtt_port); // Define servidor MQTT
+  client.setServer(server, port);         // Define IP e porta do broker MQTT
 
-  conectaMQTT(); // Conecta ao broker
+  conectaMQTT();                          // Chama função para conectar no MQTT
 }
 
-// ====== LOOP PRINCIPAL ======
+// ====== LOOP (RODA PARA SEMPRE) ======
 void loop() {
 
-  if (!client.connected()) {
-    conectaMQTT(); // Reconecta se cair
+  if (!client.connected()) {              // Se perdeu conexão com MQTT
+    conectaMQTT();                        // Reconecta automaticamente
   }
 
-  client.loop(); // Mantém conexão ativa
+  client.loop();                          // Mantém a conexão MQTT viva
 
-  // ===== LEITURA DO BOTÃO =====
-  int leitura = digitalRead(BOTAO_PIN); // Lê o pino
+  int leitura = digitalRead(BOTAO);       // Lê o estado do botão (LOW ou HIGH)
 
-  // Com pull-up: LOW = pressionado, HIGH = solto
-  estadoBotao = (leitura == LOW) ? 1 : 0;
+  // ===== BOTÃO PRESSIONADO =====
+  if (leitura == LOW) {                   // Se botão pressionado (pull-up → LOW)
+    Serial.println("1");                  // Mostra 1 na serial
+    client.publish(topic, "1");           // Publica "1" no tópico MQTT
+  }
 
-  // ===== PUBLICAÇÃO MQTT =====
-  client.publish("casa/botao", String(estadoBotao).c_str()); // Envia valor
+  // ===== BOTÃO SOLTO =====
+  if (leitura == HIGH) {                  // Se botão solto
+    Serial.println("0");                  // Mostra 0 na serial
+    client.publish(topic, "0");           // Publica "0" no tópico MQTT
+  }
 
-  Serial.print("Botão: ");
-  Serial.println(estadoBotao); // Mostra no serial
-
-  delay(2000); // Aguarda 2 segundos
+  delay(1000);                            // Espera 1 segundo antes de repetir
 }
