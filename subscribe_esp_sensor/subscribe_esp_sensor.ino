@@ -1,125 +1,99 @@
-#include <ESP8266WiFi.h>   // Biblioteca WiFi para ESP8266
-#include <PubSubClient.h>  // Biblioteca MQTT
+#include <ESP8266WiFi.h>   // Biblioteca que permite o ESP8266 conectar no Wi-Fi
+#include <PubSubClient.h>  // Biblioteca que permite usar o protocolo MQTT
 
-// ====== CONFIGURAÇÕES WIFI ======
-const char* ssid = "";       // Nome do WiFi
-const char* password = "";   // Senha do WiFi
+// ====== CONFIGURAÇÃO WIFI ======
+const char* ssid = "CSI-Lab";        // Nome da rede Wi-Fi que o ESP vai tentar conectar
+const char* password = "In@teLCS&I"; // Senha da rede Wi-Fi
 
-// ====== CONFIGURAÇÕES MQTT ======
-const char* mqtt_server = ""; // IP do broker (ex: 192.168.1.10)
-const int mqtt_port = 1883;   // Porta MQTT
+// ====== CONFIGURAÇÃO MQTT ======
+const char* server = "192.168.66.11"; // Endereço IP do broker MQTT (servidor)
+const int port = 1883;                // Porta do MQTT (1883 = padrão sem segurança)
+const char* user = "csilab";          // Usuário para autenticação no broker
+const char* pass = "WhoAmI#2024";     // Senha para autenticação no broker
+const char* topic = "casa/botao";     // Tópico que o ESP vai escutar (subscribe)
 
-const char* mqtt_user = "";   // Usuário MQTT
-const char* mqtt_pass = "";   // Senha MQTT
-
-const char* topic = "casa/botao"; // Tópico que será assinado
-
-// ====== PINOS ======
-#define LED_AZUL D1     // LED azul (liga com 1)
-#define LED_VERMELHO D2 // LED vermelho (liga com 0)
+// ====== DEFINIÇÃO DOS LEDS ======
+#define LED1 D5   // LED1 será ligado quando receber "0"
+#define LED2 D6   // LED2 será ligado quando receber "1"
+#define LED3 D7   // LED3 será ligado quando receber "1"
 
 // ====== OBJETOS ======
-WiFiClient espClient;           // Cliente WiFi
-PubSubClient client(espClient); // Cliente MQTT
+WiFiClient wifiClient;                 // Cria um objeto que gerencia a conexão Wi-Fi
+PubSubClient client(wifiClient);       // Cria o cliente MQTT usando a conexão Wi-Fi
 
-// ====== CALLBACK (QUANDO RECEBE MENSAGEM) ======
+// ====== FUNÇÃO QUE EXECUTA QUANDO CHEGA MENSAGEM MQTT ======
 void callback(char* topico, byte* payload, unsigned int length) {
-
-  String mensagem = "";
-
-  // Converte o payload (byte) para String
-  for (int i = 0; i < length; i++) {
-    mensagem += (char)payload[i];
-  }
-
-  Serial.print("TOPICO: ");
-  Serial.println(topico);
-
-  Serial.print("MENSAGEM: ");
-  Serial.println(mensagem);
-
-  // ===== CONTROLE DOS LEDs =====
-  if (mensagem == "1") {
-    digitalWrite(LED_AZUL, HIGH);      // Liga LED azul
-    digitalWrite(LED_VERMELHO, LOW);   // Desliga vermelho
-    Serial.println("LED AZUL LIGADO");
-  } 
   
-  else if (mensagem == "0") {
-    digitalWrite(LED_AZUL, LOW);       // Desliga azul
-    digitalWrite(LED_VERMELHO, HIGH);  // Liga vermelho
-    Serial.println("LED VERMELHO LIGADO");
+  Serial.println("CHEGOU MENSAGEM");   // Mostra que o ESP recebeu algo do broker
+
+  // Aqui vamos analisar apenas o PRIMEIRO caractere recebido
+  // payload[0] é o primeiro byte da mensagem
+
+  if (payload[0] == '0') {             // Se o primeiro caractere for '0'
+    digitalWrite(LED1, HIGH);          // Liga o LED1
+    digitalWrite(LED2, LOW);           // Garante que LED2 está desligado
+    digitalWrite(LED3, LOW);           // Garante que LED3 está desligado
+    Serial.println("Recebi 0");        // Mostra na serial
   }
 
-  Serial.println("-------------------");
-}
-
-// ====== CONEXÃO WIFI ======
-void conectaWiFi() {
-
-  WiFi.begin(ssid, password);
-
-  Serial.print("Conectando WiFi");
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println();
-  Serial.println("WiFi conectado");
-  Serial.println(WiFi.localIP()); // Mostra IP
-}
-
-// ====== CONEXÃO MQTT ======
-void conectaMQTT() {
-
-  while (!client.connected()) {
-
-    Serial.print("Conectando MQTT...");
-
-    if (client.connect("ESP_SUB", mqtt_user, mqtt_pass)) {
-      Serial.println("conectado");
-
-      client.subscribe(topic); // Assina o tópico
-      Serial.print("ASSINADO: ");
-      Serial.println(topic);
-    } 
-    
-    else {
-      Serial.print("Erro rc=");
-      Serial.print(client.state());
-      Serial.println(" tentando em 5s");
-      delay(5000);
-    }
+  if (payload[0] == '1') {             // Se o primeiro caractere for '1'
+    digitalWrite(LED1, LOW);           // Desliga o LED1
+    digitalWrite(LED2, HIGH);          // Liga o LED2
+    digitalWrite(LED3, HIGH);          // Liga o LED3
+    Serial.println("Recebi 1");        // Mostra na serial
   }
 }
 
-// ====== SETUP ======
+// ====== FUNÇÃO SETUP (RODA UMA VEZ AO LIGAR) ======
 void setup() {
 
-  Serial.begin(115200); // Inicia serial
+  Serial.begin(115200);                 // Inicia comunicação serial (para debug)
+  Serial.println("INICIOU CODIGO");     // Confirma que o ESP começou a rodar
 
-  pinMode(LED_AZUL, OUTPUT);     // Define LED azul como saída
-  pinMode(LED_VERMELHO, OUTPUT); // Define LED vermelho como saída
+  pinMode(LED1, OUTPUT);                // Define LED1 como saída
+  pinMode(LED2, OUTPUT);                // Define LED2 como saída
+  pinMode(LED3, OUTPUT);                // Define LED3 como saída
 
-  digitalWrite(LED_AZUL, LOW);     // Começa desligado
-  digitalWrite(LED_VERMELHO, LOW); // Começa desligado
+  Serial.println("Iniciando WiFi...");  // Mensagem antes de tentar Wi-Fi
 
-  conectaWiFi(); // Conecta WiFi
+  WiFi.begin(ssid, password);           // Começa tentativa de conexão Wi-Fi
 
-  client.setServer(mqtt_server, mqtt_port); // Define broker
-  client.setCallback(callback);             // Define função de recebimento
+  int tentativas = 0;                   // Contador de tentativas
 
-  conectaMQTT(); // Conecta MQTT
-}
-
-// ====== LOOP ======
-void loop() {
-
-  if (!client.connected()) {
-    conectaMQTT(); // Reconecta se cair
+  // Loop tenta conectar no Wi-Fi no máximo 10 vezes
+  while (WiFi.status() != WL_CONNECTED && tentativas < 10) {
+    Serial.println("Tentando WiFi..."); // Mostra tentativa
+    delay(1000);                       // Espera 1 segundo
+    tentativas++;                      // Soma uma tentativa
   }
 
-  client.loop(); // Mantém escutando mensagens
+  // Verifica se conectou ou não
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("WiFi CONECTADO");  // Conectou com sucesso
+  } else {
+    Serial.println("FALHA WIFI");      // NÃO conectou → problema de rede
+  }
+
+  client.setServer(server, port);      // Define o endereço do broker MQTT
+
+  client.setCallback(callback);        // Define a função que será chamada quando chegar mensagem
+
+  Serial.println("Conectando MQTT..."); // Aviso antes de conectar no broker
+
+  // Tenta conectar UMA VEZ (não trava o código)
+  if (client.connect("ESP_SUB", user, pass)) {
+    Serial.println("MQTT CONECTADO");  // Conectou com sucesso
+
+    client.subscribe(topic);           // Se inscreve no tópico para receber mensagens
+    Serial.println("INSCRITO NO TOPICO"); // Confirma inscrição
+  } else {
+    Serial.print("ERRO MQTT: ");       // Mostra erro
+    Serial.println(client.state());    // Código do erro MQTT
+  }
+}
+
+// ====== LOOP (RODA PARA SEMPRE) ======
+void loop() {
+
+  client.loop();                       // Mantém a comunicação MQTT funcionando
 }
